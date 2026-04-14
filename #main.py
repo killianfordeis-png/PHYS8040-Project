@@ -1,97 +1,115 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox
 from openpyxl import load_workbook  
 # standard openpyxl code:
 
-print("Welcome to the Excel Data Processor!")
-print("Enter the name of the sheet/Control Scheme you want to process (e.g. raM_Dvc_Valve(2.4):")
+class ExcelDataProcessor:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Excel Data Processor")
+        self.root.geometry("400x400")
+        self.file_path = None
+        self.workbook = None
+
+        #Open File Button
+        self.open_button = tk.Button(root, text="Open Excel File", command=self.open_file)
+        self.open_button.pack(pady=20)
+
+        #Frame
+        self.main_frame = tk.Frame(root)
+        self.main_frame.pack(pady = 10 ,fill=tk.BOTH, expand=True)
+
+        #Sheet Listbox
+        self.sheet_frame = tk.Frame(self.main_frame)
+        self.sheet_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.sheet_label = tk.Label(self.sheet_frame, text="Sheets")
+        self.sheet_label.pack()
+        self.sheet_listbox = tk.Listbox(self.sheet_frame, width=20)
+        self.sheet_listbox.pack(fill=tk.BOTH, expand=True)
+        self.sheet_listbox.bind("<<ListboxSelect>>", self.on_sheet_select)
+
+        #Names list Section
+        self.names_frame = tk.Frame(self.main_frame)
+        self.names_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        self.names_label = tk.Label(self.names_frame, text="Names")
+        self.names_label.pack()
+
+        self.names_listbox = tk.Listbox(self.names_frame, width=40)
+        self.names_listbox.pack(fill=tk.BOTH, expand=True)
 
 
-def list_names(file_path, sheet_name=None):
-    try:
-        # Attempt to load the workbook
-        workbook = load_workbook(filename=file_path, read_only=True)
-
-        if sheet_name not in workbook.sheetnames:
-            messagebox.showerror("Sheet Not Found", f"Sheet '{sheet_name}' not found in the workbook.")
 
 
-            print(f"Sheet '{sheet_name}' not found in the workbook.")
-            print("Available sheets:")
-            for sheet in workbook.sheetnames:
-                print(f"- {sheet}")
+    def open_file(self):
+        file_path = filedialog.askopenfilename(title="Select Excel File", filetypes=[("Excel files", "*.xlsx *.xls")])
+        if not file_path:
+            messagebox.showwarning("No File Selected", "Please select an Excel file to proceed.")
+            return
+        try: 
+            self.workbook = load_workbook(filename=file_path, read_only=True)
+            self.file_path = file_path
+            
+            self.sheet_listbox.delete(0, tk.END)  # Clear existing items in the listbox
+            self.names_listbox.delete(0, tk.END)  # Clear existing items in the names listbox
+
+            for sheet_name in self.workbook.sheetnames:
+                self.sheet_listbox.insert(tk.END, sheet_name)
+
+        except FileNotFoundError:
+                messagebox.showerror("File Not Found", f"File '{file_path}' not found. Please check the file path and try again.")
+        except Exception as e:
+                messagebox.showerror("Error", f"An error occurred: {e}")
+             
+    def on_sheet_select(self, event):
+        if not self.workbook:
+             return
+        selection = self.sheet_listbox.curselection()
+        if not selection:
+             return
+        
+        selected_index = selection[0]
+        sheet_name = self.sheet_listbox.get(selected_index)
+
+        names = self.list_names(sheet_name)
+        self.names_listbox.delete(0, tk.END)    
+
+
+        if names: 
+             for name in names:
+                    self.names_listbox.insert(tk.END, name)
+        else:
+             self.names_listbox.insert(tk.END, "No names found in this sheet.")
+   
+   
+    def list_names(self, sheet_name):
+        try:
+            if sheet_name not in self.workbook.sheetnames:
+                messagebox.showerror("Sheet Not Found", f"Sheet '{sheet_name}' not found in the workbook.")
+                return []
+
+            sheet = self.workbook[sheet_name]
+            names = []
+
+            for row in sheet.iter_rows(min_row=4, values_only=True):
+                name = row[0]
+                if name is None:
+                    continue
+                if isinstance(name, str) and name.startswith("$"):
+                    continue
+                names.append(name)
+
+            return names
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred while processing the sheet: {e}")
             return []
+         
 
-        sheet = workbook[sheet_name]
-
-        names = []
-        # In case of valves, the names are in column A, starting from row 4.
-        # This will be changed to work off color in the future.
-        for row in sheet.iter_rows(min_row=4, values_only=True):
-            name = row[0]
-
-            if name is None:
-                continue
-
-            if isinstance(name, str) and name.startswith("$"):
-                continue
-
-            names.append(name)
-        return names
-
-    except FileNotFoundError:
-        print(f"File '{file_path}' not found. Please check the file path and try again.")
-        return []
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return
-
-
-#OPEN FILE FUNCTION:
-def open_file():
-    file_path = filedialog.askopenfilename(title="Select Excel File", filetypes=[("Excel files", "*.xlsx *.xls")])
-    if file_path:
-        list_names(file_path)
-    else:
-        messagebox.showwarning("No File Selected", "Please select an Excel file to process.")
-
-
-    names = list_names(file_path)
-
-    listbox.delete(0, tk.END)
-
-    if names:
-        for name in names:
-            listbox.insert(tk.END, name)
-    else:
-        listbox.insert(tk.END, "No names found.")
-
-
-
-
-
-
-
-
-#TKINTER GUI
+#Run GUI
 
 root = tk.Tk()
-root.title("Excel Data Processor")
-root.geometry("400x400")
-
-
-open_button = tk.Button(root, text="Open Excel File", command=open_file)
-open_button.pack(pady=20)
-
-list_button = tk.Button(root, text="List Names", command=list_names)
-list_button.pack(pady=20)
-
-listbox = tk.Listbox(root, width=50, height=15)
-listbox.pack(pady=20)
-
-
-
-
+app = ExcelDataProcessor(root)
 root.mainloop()
+                 
+
 
     
